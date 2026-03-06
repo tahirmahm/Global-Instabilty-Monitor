@@ -82,18 +82,6 @@ body {
   50%       { opacity: 0.5; transform: scale(0.8); }
 }
 
-/* ─── Radar ring animations ──────────────────────────────── */
-@keyframes radarSpin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes radarSpinRev {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(-360deg); }
-}
-.radar-spin     { animation: radarSpin    30s linear infinite; transform-origin: 50px 50px; }
-.radar-spin-rev { animation: radarSpinRev 18s linear infinite; transform-origin: 50px 50px; }
-
 /* ─── Red glow on numbers ────────────────────────────────── */
 .num-glow-red {
   text-shadow: 0 0 12px rgba(239,68,68,0.7), 0 0 24px rgba(239,68,68,0.3);

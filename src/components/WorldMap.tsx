@@ -291,20 +291,6 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
             strokeWidth={t.isMajor ? '0.3' : '0.15'} />
         ))}
 
-        {/* Outer rotating dashed ring */}
-        <g className="radar-spin">
-          <circle cx="50" cy="50" r="47" fill="none"
-            stroke="rgba(255,255,255,0.14)" strokeWidth="0.35"
-            strokeDasharray="3.5 2.5" strokeLinecap="round" />
-        </g>
-
-        {/* Second counter-rotating dashed ring */}
-        <g className="radar-spin-rev">
-          <circle cx="50" cy="50" r="44.5" fill="none"
-            stroke="rgba(239,68,68,0.18)" strokeWidth="0.25"
-            strokeDasharray="1.5 3.5" />
-        </g>
-
         {/* Static red accent ring */}
         <circle cx="50" cy="50" r="42" fill="none"
           stroke="rgba(239,68,68,0.12)" strokeWidth="0.2" />
