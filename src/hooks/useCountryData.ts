@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { CountryData, GlobalStats, DataFetchStatus } from '@/types';
+import { CountryData, GlobalStats, DataFetchStatus, EarlyWarningAlert } from '@/types';
 import { initializeModel, computeGlobalStats } from '@/lib/logisticRegression';
+import { applySignals, generateAlerts } from '@/lib/collapseEngine';
 
-const CACHE_KEY = 'grm_country_data_v2';
+const CACHE_KEY = 'grm_country_data_v3';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 interface CachedData {
@@ -39,15 +40,22 @@ function saveToCache(data: CountryData[]) {
 }
 
 export function useCountryData() {
-  const [countries, setCountries] = useState<CountryData[]>([]);
-  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [fetchStatus, setFetchStatus] = useState<DataFetchStatus>({
-    worldbank: 'idle',
-    conflicts: 'idle',
-    economic: 'idle',
+  const [countries, setCountries]       = useState<CountryData[]>([]);
+  const [globalStats, setGlobalStats]   = useState<GlobalStats | null>(null);
+  const [alerts, setAlerts]             = useState<EarlyWarningAlert[]>([]);
+  const [isLoading, setIsLoading]       = useState(true);
+  const [fetchStatus, setFetchStatus]   = useState<DataFetchStatus>({
+    worldbank: 'idle', conflicts: 'idle', economic: 'idle',
   });
   const [dataSource, setDataSource] = useState<'cache' | 'live' | 'baseline'>('baseline');
+
+  const applyAndSet = useCallback((raw: CountryData[], source: 'cache' | 'live' | 'baseline') => {
+    const enhanced = applySignals(raw);
+    setCountries(enhanced);
+    setGlobalStats(computeGlobalStats(enhanced));
+    setAlerts(generateAlerts(enhanced));
+    setDataSource(source);
+  }, []);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -55,21 +63,18 @@ export function useCountryData() {
     // Try cache first
     const cached = loadFromCache();
     if (cached && cached.length > 0) {
-      setCountries(cached);
-      setGlobalStats(computeGlobalStats(cached));
-      setDataSource('cache');
+      // Re-apply signals (they are derived, not cached)
+      applyAndSet(cached, 'cache');
       setIsLoading(false);
       return;
     }
 
-    // Initialize with baseline model
+    // Initialize with baseline Goldstone model, then layer signals
     const baselineData = initializeModel();
-    setCountries(baselineData);
-    setGlobalStats(computeGlobalStats(baselineData));
-    setDataSource('baseline');
+    applyAndSet(baselineData, 'baseline');
     setIsLoading(false);
 
-    // Try to fetch live data in background and update if successful
+    // Background: try to fetch live World Bank data
     try {
       setFetchStatus(prev => ({ ...prev, worldbank: 'loading', economic: 'loading' }));
 
@@ -128,21 +133,18 @@ export function useCountryData() {
       }
 
       if (liveUpdated) {
-        // Recompute model with updated data
+        // Recompute Goldstone, then layer signals
         const { computeCollapseModel } = await import('@/lib/logisticRegression');
         const recomputed = computeCollapseModel(updatedData);
-        setCountries(recomputed);
-        setGlobalStats(computeGlobalStats(recomputed));
-        setDataSource('live');
+        applyAndSet(recomputed, 'live');
         saveToCache(recomputed);
       } else {
         saveToCache(baselineData);
       }
     } catch {
-      // Use baseline data if network fails
       saveToCache(baselineData);
     }
-  }, []);
+  }, [applyAndSet]);
 
   useEffect(() => {
     loadData();
@@ -155,12 +157,5 @@ export function useCountryData() {
     loadData();
   }, [loadData]);
 
-  return {
-    countries,
-    globalStats,
-    isLoading,
-    fetchStatus,
-    dataSource,
-    refresh,
-  };
+  return { countries, globalStats, alerts, isLoading, fetchStatus, dataSource, refresh };
 }
