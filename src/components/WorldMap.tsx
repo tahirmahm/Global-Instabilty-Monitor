@@ -238,8 +238,20 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
     };
   };
 
+  // Build radar tick marks (every 5°, major every 30°)
+  const tickMarks = Array.from({ length: 72 }, (_, i) => {
+    const angle = (i * 5 * Math.PI) / 180;
+    const isMajor = i % 6 === 0;
+    const r1 = 48.5, r2 = isMajor ? 46 : 47.5;
+    return {
+      x1: 50 + r1 * Math.sin(angle), y1: 50 - r1 * Math.cos(angle),
+      x2: 50 + r2 * Math.sin(angle), y2: 50 - r2 * Math.cos(angle),
+      isMajor,
+    };
+  });
+
   return (
-    <div ref={containerRef} className="relative w-full h-full bg-slate-950 overflow-hidden rounded-lg border border-slate-800">
+    <div ref={containerRef} className="relative w-full h-full overflow-hidden" style={{ background: '#070a12' }}>
       {/* Map SVG */}
       <svg
         ref={svgRef}
@@ -252,38 +264,108 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
         onWheel={handleWheel}
       />
 
+      {/* ── Radar ring overlay (purely decorative, pointer-events none) ── */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none z-10"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="xMidYMid meet"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <radialGradient id="vignetteGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="55%" stopColor="transparent" />
+            <stop offset="100%" stopColor="rgba(7,10,18,0.65)" />
+          </radialGradient>
+        </defs>
+
+        {/* Vignette */}
+        <rect width="100" height="100" fill="url(#vignetteGrad)" />
+
+        {/* Outermost static guide ring */}
+        <circle cx="50" cy="50" r="48.5" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.2" />
+
+        {/* Tick marks */}
+        {tickMarks.map((t, i) => (
+          <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+            stroke={t.isMajor ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}
+            strokeWidth={t.isMajor ? '0.3' : '0.15'} />
+        ))}
+
+        {/* Outer rotating dashed ring */}
+        <g className="radar-spin">
+          <circle cx="50" cy="50" r="47" fill="none"
+            stroke="rgba(255,255,255,0.14)" strokeWidth="0.35"
+            strokeDasharray="3.5 2.5" strokeLinecap="round" />
+        </g>
+
+        {/* Second counter-rotating dashed ring */}
+        <g className="radar-spin-rev">
+          <circle cx="50" cy="50" r="44.5" fill="none"
+            stroke="rgba(239,68,68,0.18)" strokeWidth="0.25"
+            strokeDasharray="1.5 3.5" />
+        </g>
+
+        {/* Static red accent ring */}
+        <circle cx="50" cy="50" r="42" fill="none"
+          stroke="rgba(239,68,68,0.12)" strokeWidth="0.2" />
+
+        {/* Compass — N */}
+        <polygon points="50,1.5 48.8,4.5 50,3.8 51.2,4.5" fill="rgba(255,255,255,0.7)" />
+        <text x="50" y="8" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="2.2" fontFamily="monospace">N</text>
+
+        {/* Compass — S */}
+        <polygon points="50,98.5 48.8,95.5 50,96.2 51.2,95.5" fill="rgba(255,255,255,0.4)" />
+        <text x="50" y="96.5" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">S</text>
+
+        {/* Compass — E */}
+        <text x="97.5" y="50.8" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">E</text>
+
+        {/* Compass — W */}
+        <text x="2.5" y="50.8" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">W</text>
+
+        {/* Crosshair lines through center */}
+        <line x1="50" y1="3"  x2="50" y2="97" stroke="rgba(255,255,255,0.03)" strokeWidth="0.15" />
+        <line x1="3"  y1="50" x2="97" y2="50" stroke="rgba(255,255,255,0.03)" strokeWidth="0.15" />
+      </svg>
+
       {/* Loading state */}
       {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80">
-          <div className="text-center">
-            <div className="inline-block w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-2" />
-            <div className="text-cyan-400 font-mono text-sm">LOADING MAP DATA...</div>
+        <div className="absolute inset-0 flex items-center justify-center z-20" style={{ background: 'rgba(7,10,18,0.85)' }}>
+          <div className="text-center font-mono">
+            <div className="inline-block w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin mb-2" />
+            <div className="text-red-400 text-sm tracking-widest">LOADING MAP DATA...</div>
           </div>
         </div>
       )}
 
       {/* Zoom Controls */}
-      <div className="absolute top-3 right-3 flex flex-col gap-1 z-10">
-        <button onClick={() => handleZoom(1.3)} className="w-7 h-7 bg-slate-800/90 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 font-mono text-base flex items-center justify-center rounded transition-colors">+</button>
-        <button onClick={() => handleZoom(0.77)} className="w-7 h-7 bg-slate-800/90 border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 font-mono text-base flex items-center justify-center rounded transition-colors">−</button>
-        <button onClick={handleReset} title="Reset" className="w-7 h-7 bg-slate-800/90 border border-slate-600 text-slate-400 hover:text-white hover:bg-slate-700 font-mono text-[10px] flex items-center justify-center rounded transition-colors">⊡</button>
+      <div className="absolute top-3 right-3 flex flex-col gap-1 z-20">
+        {[['+',(1.3)],['−',(0.77)]].map(([sym, f]) => (
+          <button key={sym as string} onClick={() => handleZoom(f as number)}
+            className="w-7 h-7 font-mono text-base flex items-center justify-center rounded transition-colors"
+            style={{ background: 'rgba(15,21,37,0.9)', border: '1px solid rgba(239,68,68,0.2)', color: '#94a3b8' }}
+          >{sym}</button>
+        ))}
+        <button onClick={handleReset} title="Reset"
+          className="w-7 h-7 font-mono text-[10px] flex items-center justify-center rounded transition-colors"
+          style={{ background: 'rgba(15,21,37,0.9)', border: '1px solid rgba(239,68,68,0.2)', color: '#64748b' }}
+        >⊡</button>
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-3 left-3 bg-slate-900/95 border border-slate-700 rounded p-2 font-mono z-10">
-        <div className="text-slate-500 text-[9px] tracking-widest mb-1.5">COLLAPSE RISK</div>
-        <div className="flex flex-col gap-0.5">
-          {[...TIERS].reverse().map(tier => (
-            <div key={tier.label} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: tier.fill }} />
-              <span className="text-slate-400 text-[10px] w-16">{tier.label}</span>
-              <span className="text-slate-600 text-[9px]">{tier.range}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5 mt-0.5 pt-1 border-t border-slate-800">
-            <div className="w-2.5 h-2 rounded-sm flex-shrink-0 bg-slate-700" />
-            <span className="text-slate-600 text-[10px]">NO DATA</span>
+      <div className="absolute bottom-3 left-3 z-20 font-mono"
+        style={{ background: 'rgba(11,15,28,0.95)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: 4, padding: '6px 8px' }}>
+        <div className="text-[8px] tracking-widest mb-1.5" style={{ color: '#475569' }}>COLLAPSE RISK</div>
+        {[...TIERS].reverse().map(tier => (
+          <div key={tier.label} className="flex items-center gap-1.5 mb-0.5">
+            <div className="w-2 h-1.5 rounded-sm flex-shrink-0" style={{ backgroundColor: tier.fill }} />
+            <span className="text-[9px] w-14" style={{ color: '#94a3b8' }}>{tier.label}</span>
+            <span className="text-[8px]" style={{ color: '#334155' }}>{tier.range}</span>
           </div>
+        ))}
+        <div className="flex items-center gap-1.5 mt-1 pt-1" style={{ borderTop: '1px solid #1e293b' }}>
+          <div className="w-2 h-1.5 rounded-sm flex-shrink-0" style={{ background: '#1e293b' }} />
+          <span className="text-[9px]" style={{ color: '#334155' }}>NO DATA</span>
         </div>
       </div>
 
@@ -296,12 +378,19 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
 
         return (
           <div
-            className="absolute z-30 bg-slate-900/98 border border-slate-600 rounded-lg shadow-2xl font-mono overflow-hidden"
-            style={{ left: pos.left, top: pos.top, width: 276 }}
+            className="absolute z-30 font-mono overflow-hidden shadow-2xl"
+            style={{
+              left: pos.left, top: pos.top, width: 276,
+              background: 'rgba(7,10,18,0.97)',
+              border: `1px solid ${tier.fill}40`,
+              borderLeft: `3px solid ${tier.fill}`,
+              borderRadius: 4,
+              boxShadow: `0 0 20px ${tier.fill}20`,
+            }}
           >
             {/* Header */}
-            <div className="flex items-start justify-between px-3 pt-2.5 pb-2 border-b border-slate-700"
-              style={{ borderLeftWidth: 3, borderLeftColor: tier.fill }}>
+            <div className="flex items-start justify-between px-3 pt-2.5 pb-2"
+              style={{ borderBottom: '1px solid rgba(239,68,68,0.12)' }}>
               <div>
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <span className="text-slate-500 text-[9px]">{c.iso3}</span>
@@ -317,7 +406,7 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
             </div>
 
             {/* Probability + gauge */}
-            <div className="flex items-center gap-3 px-3 py-2.5 border-b border-slate-800">
+            <div className="flex items-center gap-3 px-3 py-2.5" style={{ borderBottom: '1px solid rgba(239,68,68,0.08)' }}>
               <svg width="64" height="64" viewBox="0 0 64 64" className="flex-shrink-0">
                 <circle cx="32" cy="32" r="28" fill="none" stroke="#1e293b" strokeWidth="6" />
                 <circle
@@ -353,8 +442,8 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
             </div>
 
             {/* Variable contributions */}
-            <div className="px-3 py-2 border-b border-slate-800">
-              <div className="text-slate-500 text-[9px] tracking-widest mb-1.5">MODEL VARIABLE CONTRIBUTIONS</div>
+            <div className="px-3 py-2" style={{ borderBottom: '1px solid rgba(239,68,68,0.08)' }}>
+              <div className="text-[9px] tracking-widest mb-1.5" style={{ color: '#ef444460' }}>MODEL VARIABLE CONTRIBUTIONS</div>
               {popupAnalysis.contributions
                 .sort((a, b) => b.contribution - a.contribution)
                 .map(contrib => (
@@ -374,8 +463,8 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
             </div>
 
             {/* Raw indicators grid */}
-            <div className="px-3 py-2 border-b border-slate-800">
-              <div className="text-slate-500 text-[9px] tracking-widest mb-1.5">INDICATORS</div>
+            <div className="px-3 py-2" style={{ borderBottom: '1px solid rgba(239,68,68,0.08)' }}>
+              <div className="text-[9px] tracking-widest mb-1.5" style={{ color: '#ef444460' }}>INDICATORS</div>
               <div className="grid grid-cols-2 gap-1">
                 {[
                   { k: 'Regime Score', v: `${c.regimeScore > 0 ? '+' : ''}${c.regimeScore} / 10` },
@@ -385,8 +474,8 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
                   { k: 'GDP Growth', v: `${c.gdpGrowthRate > 0 ? '+' : ''}${c.gdpGrowthRate.toFixed(1)}%` },
                   { k: 'GDP / Capita', v: c.gdpPerCapita ? `$${c.gdpPerCapita.toLocaleString()}` : 'N/A' },
                 ].map(({ k, v }) => (
-                  <div key={k} className="bg-slate-800/60 rounded px-1.5 py-1">
-                    <div className="text-slate-600 text-[8px] tracking-wide">{k.toUpperCase()}</div>
+                  <div key={k} className="rounded px-1.5 py-1" style={{ background: 'rgba(15,21,37,0.8)', border: '1px solid rgba(239,68,68,0.06)' }}>
+                    <div className="text-[8px] tracking-wide" style={{ color: '#475569' }}>{k.toUpperCase()}</div>
                     <div className="text-white text-[10px] font-bold mt-0.5">{v}</div>
                   </div>
                 ))}
@@ -395,8 +484,8 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
 
             {/* Assessment */}
             <div className="px-3 py-2">
-              <div className="text-slate-500 text-[9px] tracking-widest mb-1">ASSESSMENT</div>
-              <p className="text-slate-400 text-[10px] leading-relaxed">{popupAnalysis.modelExplanation}</p>
+              <div className="text-[9px] tracking-widest mb-1" style={{ color: '#ef444460' }}>ASSESSMENT</div>
+              <p className="text-[10px] leading-relaxed" style={{ color: '#94a3b8' }}>{popupAnalysis.modelExplanation}</p>
             </div>
           </div>
         );

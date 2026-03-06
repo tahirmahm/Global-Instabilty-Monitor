@@ -6,69 +6,91 @@ import { CountryData } from '@/types';
 interface TopThreatsProps {
   countries: CountryData[];
   onCountrySelect: (country: CountryData) => void;
+  selectedCountry?: CountryData | null;
+  limit?: number;
 }
 
-const RISK_BAR_COLORS = {
-  CRITICAL: 'bg-red-600',
-  HIGH: 'bg-orange-500',
-  ELEVATED: 'bg-yellow-500',
-  MODERATE: 'bg-green-500',
-  LOW: 'bg-emerald-600',
+const TIER_COLORS: Record<string, string> = {
+  EXTREME:  '#7f1d1d',
+  CRITICAL: '#b91c1c',
+  SEVERE:   '#dc2626',
+  HIGH:     '#ea580c',
+  ELEVATED: '#d97706',
+  MODERATE: '#ca8a04',
+  GUARDED:  '#65a30d',
+  LOW:      '#16a34a',
+  'VERY LOW': '#166534',
 };
 
-const RISK_TEXT_COLORS = {
-  CRITICAL: 'text-red-400',
-  HIGH: 'text-orange-400',
-  ELEVATED: 'text-yellow-400',
-  MODERATE: 'text-green-400',
-  LOW: 'text-emerald-500',
-};
+function getRiskLabel(prob: number): string {
+  if (prob > 0.75) return 'EXTREME';
+  if (prob > 0.62) return 'CRITICAL';
+  if (prob > 0.50) return 'SEVERE';
+  if (prob > 0.38) return 'HIGH';
+  if (prob > 0.28) return 'ELEVATED';
+  if (prob > 0.18) return 'MODERATE';
+  if (prob > 0.10) return 'GUARDED';
+  if (prob > 0.05) return 'LOW';
+  return 'VERY LOW';
+}
 
-export default function TopThreats({ countries, onCountrySelect }: TopThreatsProps) {
-  const topCountries = useMemo(() => {
-    return [...countries]
-      .sort((a, b) => b.collapseProb - a.collapseProb)
-      .slice(0, 15);
-  }, [countries]);
-
+export default function TopThreats({ countries, onCountrySelect, selectedCountry, limit = 12 }: TopThreatsProps) {
+  const topCountries = useMemo(() =>
+    [...countries].sort((a, b) => b.collapseProb - a.collapseProb).slice(0, limit),
+    [countries, limit]
+  );
   const maxProb = topCountries[0]?.collapseProb ?? 1;
 
   return (
-    <div className="font-mono h-full flex flex-col">
-      <div className="text-slate-400 text-xs tracking-wider mb-2 px-1">TOP 15 COLLAPSE RISKS</div>
+    <div className="h-full flex flex-col">
+      <div className="dv-section-header">
+        <div className="dv-section-dot" />
+        <span className="text-slate-300 text-[10px] font-bold tracking-widest">TOP COLLAPSE RISKS</span>
+      </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1">
+      {/* Table header */}
+      <div className="grid grid-cols-12 text-[9px] text-slate-600 tracking-wider px-1 pb-1 border-b border-slate-800 flex-shrink-0">
+        <div className="col-span-1">#</div>
+        <div className="col-span-6">COUNTRY</div>
+        <div className="col-span-3 text-right">P(COLL)</div>
+        <div className="col-span-2 text-right">TIER</div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto custom-scrollbar mt-1 space-y-0.5">
         {topCountries.map((country, idx) => {
-          const barWidth = (country.collapseProb / maxProb) * 100;
+          const tier = getRiskLabel(country.collapseProb);
+          const color = TIER_COLORS[tier] ?? '#ef4444';
+          const barPct = (country.collapseProb / maxProb) * 100;
+          const isSelected = selectedCountry?.iso3 === country.iso3;
 
           return (
             <div
               key={country.iso3}
               onClick={() => onCountrySelect(country)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-800/60 transition-colors border border-transparent hover:border-slate-700"
+              className="grid grid-cols-12 items-center px-1 py-1 cursor-pointer transition-colors rounded-sm"
+              style={{
+                background: isSelected
+                  ? 'rgba(239,68,68,0.12)'
+                  : idx % 2 === 0 ? 'rgba(15,21,37,0.6)' : 'transparent',
+                borderLeft: isSelected ? '2px solid #ef4444' : '2px solid transparent',
+              }}
             >
-              {/* Rank */}
-              <div className="text-slate-600 text-[10px] w-4 text-right flex-shrink-0">{idx + 1}</div>
-
-              {/* Country name + bar */}
-              <div className="flex-1 min-w-0">
-                <div className="flex justify-between items-center mb-0.5">
-                  <span className="text-slate-200 text-xs font-medium truncate">{country.name}</span>
-                  <span className={`text-xs font-bold ml-2 flex-shrink-0 ${RISK_TEXT_COLORS[country.riskLevel]}`}>
-                    {(country.collapseProb * 100).toFixed(1)}%
-                  </span>
+              <div className="col-span-1 text-[9px] text-slate-600 font-bold">{idx + 1}</div>
+              <div className="col-span-6 min-w-0">
+                <div className="text-[10px] text-slate-200 truncate leading-tight">{country.name}</div>
+                {/* bar */}
+                <div className="h-0.5 mt-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${barPct}%`, backgroundColor: color, opacity: 0.85 }}
+                  />
                 </div>
-                <div className="flex items-center gap-1">
-                  <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${RISK_BAR_COLORS[country.riskLevel]}`}
-                      style={{ width: `${barWidth}%`, opacity: 0.8 }}
-                    />
-                  </div>
-                  <span className={`text-[9px] flex-shrink-0 w-14 text-right ${RISK_TEXT_COLORS[country.riskLevel]}`}>
-                    {country.riskLevel}
-                  </span>
-                </div>
+              </div>
+              <div className="col-span-3 text-right font-bold text-[10px]" style={{ color }}>
+                {(country.collapseProb * 100).toFixed(1)}%
+              </div>
+              <div className="col-span-2 text-right text-[8px] font-bold" style={{ color, opacity: 0.8 }}>
+                {tier.slice(0, 4)}
               </div>
             </div>
           );
