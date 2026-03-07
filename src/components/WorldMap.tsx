@@ -238,8 +238,8 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
     };
   };
 
-  // Build radar tick marks (every 5°, major every 30°)
-  const tickMarks = Array.from({ length: 72 }, (_, i) => {
+  // Build radar tick marks (every 5°, major every 30°) — kept for potential future use
+  const tickMarks = Array.from({ length: 0 }, (_, i) => {
     const angle = (i * 5 * Math.PI) / 180;
     const isMajor = i % 6 === 0;
     const r1 = 48.5, r2 = isMajor ? 46 : 47.5;
@@ -281,37 +281,6 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
         {/* Vignette */}
         <rect width="100" height="100" fill="url(#vignetteGrad)" />
 
-        {/* Outermost static guide ring */}
-        <circle cx="50" cy="50" r="48.5" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.2" />
-
-        {/* Tick marks */}
-        {tickMarks.map((t, i) => (
-          <line key={i} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-            stroke={t.isMajor ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)'}
-            strokeWidth={t.isMajor ? '0.3' : '0.15'} />
-        ))}
-
-        {/* Static red accent ring */}
-        <circle cx="50" cy="50" r="42" fill="none"
-          stroke="rgba(239,68,68,0.12)" strokeWidth="0.2" />
-
-        {/* Compass — N */}
-        <polygon points="50,1.5 48.8,4.5 50,3.8 51.2,4.5" fill="rgba(255,255,255,0.7)" />
-        <text x="50" y="8" textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="2.2" fontFamily="monospace">N</text>
-
-        {/* Compass — S */}
-        <polygon points="50,98.5 48.8,95.5 50,96.2 51.2,95.5" fill="rgba(255,255,255,0.4)" />
-        <text x="50" y="96.5" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">S</text>
-
-        {/* Compass — E */}
-        <text x="97.5" y="50.8" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">E</text>
-
-        {/* Compass — W */}
-        <text x="2.5" y="50.8" textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="2.2" fontFamily="monospace">W</text>
-
-        {/* Crosshair lines through center */}
-        <line x1="50" y1="3"  x2="50" y2="97" stroke="rgba(255,255,255,0.03)" strokeWidth="0.15" />
-        <line x1="3"  y1="50" x2="97" y2="50" stroke="rgba(255,255,255,0.03)" strokeWidth="0.15" />
       </svg>
 
       {/* Loading state */}
