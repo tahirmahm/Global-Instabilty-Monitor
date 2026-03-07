@@ -280,6 +280,57 @@ function CountryPopup({
   );
 }
 
+// Names in GeoJSON that differ from our country data names
+const GEO_NAME_OVERRIDES: Record<string, string> = {
+  'united states of america': 'United States',
+  'united states':            'United States',
+  "democratic republic of the congo": 'DR Congo',
+  'republic of the congo':    'Congo',
+  "côte d'ivoire":            'Ivory Coast',
+  "cote d'ivoire":            'Ivory Coast',
+  'ivory coast':              'Ivory Coast',
+  'syrian arab republic':     'Syria',
+  'iran (islamic republic of)': 'Iran',
+  'iran, islamic republic of': 'Iran',
+  'viet nam':                 'Vietnam',
+  'lao pdr':                  'Laos',
+  "lao people's democratic republic": 'Laos',
+  'myanmar':                  'Myanmar',
+  'russian federation':       'Russia',
+  'republic of korea':        'South Korea',
+  "democratic people's republic of korea": 'North Korea',
+  'korea, south':             'South Korea',
+  'korea, north':             'North Korea',
+  'taiwan, province of china':'Taiwan',
+  'tanzania, united republic of': 'Tanzania',
+  'bolivia (plurinational state of)': 'Bolivia',
+  'venezuela (bolivarian republic of)': 'Venezuela',
+  'palestine, state of':      'Palestine',
+  'state of palestine':       'Palestine',
+  'occupied palestinian territory': 'Palestine',
+  'czech republic':           'Czechia',
+  'czechia':                  'Czechia',
+  'eswatini':                 'Eswatini',
+  'swaziland':                'Eswatini',
+  'cabo verde':               'Cabo Verde',
+  'cape verde':               'Cabo Verde',
+  'timor-leste':              'Timor-Leste',
+  'east timor':               'Timor-Leste',
+  'sao tome and principe':    'São Tomé and Príncipe',
+  'são tomé and príncipe':    'São Tomé and Príncipe',
+  'central african republic': 'Central African Republic',
+  'equatorial guinea':        'Equatorial Guinea',
+  'guinea-bissau':            'Guinea-Bissau',
+  'guinea bissau':            'Guinea-Bissau',
+  'solomon islands':          'Solomon Islands',
+  'papua new guinea':         'Papua New Guinea',
+  'new zealand':              'New Zealand',
+  'south africa':             'South Africa',
+  'south sudan':              'South Sudan',
+  'sierra leone':             'Sierra Leone',
+  'sri lanka':                'Sri Lanka',
+};
+
 // ── Main WorldMap component ──────────────────────────────────────────────────
 export default function WorldMap({ countries, selectedCountry, onCountrySelect }: WorldMapProps) {
   const svgRef       = useRef<SVGSVGElement>(null);
@@ -290,21 +341,35 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
 
   const countryMap  = useRef<Map<string, CountryData>>(new Map());
+  const nameMap     = useRef<Map<string, CountryData>>(new Map());
   const isDragging  = useRef(false);
   const dragStart   = useRef({ x: 0, y: 0 });
   const didDrag     = useRef(false);
 
   useEffect(() => {
-    const map = new Map<string, CountryData>();
-    countries.forEach(c => { map.set(c.iso3, c); map.set(c.iso2, c); });
-    countryMap.current = map;
+    const isoMap  = new Map<string, CountryData>();
+    const nMap    = new Map<string, CountryData>();
+    countries.forEach(c => {
+      isoMap.set(c.iso3.toUpperCase(), c);
+      isoMap.set(c.iso2.toUpperCase(), c);
+      nMap.set(c.name.toLowerCase(), c);
+    });
+    countryMap.current = isoMap;
+    nameMap.current    = nMap;
   }, [countries]);
 
   useEffect(() => {
-    fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson')
+    // geo-countries: reliable ISO_A3 + ADMIN name, CORS-friendly GitHub raw
+    fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
       .then(r => r.json())
       .then(data => { setGeoData(data); setIsLoaded(true); })
-      .catch(() => setIsLoaded(true));
+      .catch(() => {
+        // Fallback to holtzy source
+        fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson')
+          .then(r => r.json())
+          .then(data => { setGeoData(data); setIsLoaded(true); })
+          .catch(() => setIsLoaded(true));
+      });
   }, []);
 
   const renderMap = useCallback(() => {
@@ -336,11 +401,26 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
       if (!feature.geometry) return;
 
       const props = feature.properties as Record<string, string>;
-      const iso3  = props?.['iso_a3'] || props?.['ISO_A3'] || '';
-      const iso2  = props?.['iso_a2'] || props?.['ISO_A2'] || '';
 
-      const countryData = countryMap.current.get(iso3) || countryMap.current.get(iso2);
-      const isSelected  = selectedCountry?.iso3 === iso3;
+      // Try every known ISO property name from different GeoJSON sources
+      const rawIso3 = (props?.['ISO_A3'] || props?.['iso_a3'] || props?.['ADM0_A3'] || '').trim().toUpperCase();
+      const rawIso2 = (props?.['ISO_A2'] || props?.['iso_a2'] || '').trim().toUpperCase();
+      const geoName = (props?.['ADMIN'] || props?.['name'] || props?.['NAME'] || '').trim().toLowerCase();
+
+      // Skip sentinel/invalid codes
+      const iso3 = (rawIso3 === '-99' || rawIso3 === '-1' || rawIso3 === 'N/A') ? '' : rawIso3;
+      const iso2 = (rawIso2 === '-99' || rawIso2 === '-1') ? '' : rawIso2;
+
+      // Resolve name via override table first, then direct lookup
+      const resolvedName = GEO_NAME_OVERRIDES[geoName] ?? geoName;
+
+      const countryData =
+        (iso3 ? countryMap.current.get(iso3) : undefined)
+        ?? (iso2 ? countryMap.current.get(iso2) : undefined)
+        ?? nameMap.current.get(resolvedName)
+        ?? nameMap.current.get(geoName);
+
+      const isSelected  = selectedCountry?.iso3 === (countryData?.iso3 ?? iso3);
       const fillColor   = countryData ? getRiskColor(countryData.collapseProb) : '#1e293b';
 
       const geom = feature.geometry as GeoJSON.Geometry;
@@ -377,7 +457,7 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
           const svgRect = svg.getBoundingClientRect();
           const cx = e.clientX - svgRect.left;
           const cy = e.clientY - svgRect.top;
-          if (selectedCountry?.iso3 === iso3) {
+          if (selectedCountry?.iso3 === countryData.iso3) {
             setPopup(null);
             onCountrySelect(null);
           } else {
@@ -412,7 +492,7 @@ export default function WorldMap({ countries, selectedCountry, onCountrySelect }
           text.setAttribute('font-size',        `${Math.max(4, Math.min(7, area / 1200))}`);
           text.setAttribute('font-family',      'monospace');
           text.setAttribute('pointer-events',   'none');
-          text.textContent = iso3;
+          text.textContent = countryData.iso3;
           g.appendChild(text);
         }
       }
