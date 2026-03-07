@@ -7,16 +7,17 @@ interface DonutChartProps {
   countries: CountryData[];
 }
 
+// Ordered lowest→highest so the linear scan correctly finds the first matching bracket
 const TIERS = [
-  { key: 'EXTREME',  color: '#7f1d1d', label: 'EXTREME',  max: 1.00 },
-  { key: 'CRITICAL', color: '#b91c1c', label: 'CRITICAL', max: 0.75 },
-  { key: 'SEVERE',   color: '#dc2626', label: 'SEVERE',   max: 0.62 },
-  { key: 'HIGH',     color: '#ea580c', label: 'HIGH',     max: 0.50 },
-  { key: 'ELEVATED', color: '#d97706', label: 'ELEVATED', max: 0.38 },
-  { key: 'MODERATE', color: '#ca8a04', label: 'MODERATE', max: 0.28 },
-  { key: 'GUARDED',  color: '#65a30d', label: 'GUARDED',  max: 0.18 },
+  { key: 'VERY LOW', color: '#15803d', label: 'VERY LOW', max: 0.05 },
   { key: 'LOW',      color: '#16a34a', label: 'LOW',      max: 0.10 },
-  { key: 'VERY LOW', color: '#166534', label: 'VERY LOW', max: 0.05 },
+  { key: 'GUARDED',  color: '#65a30d', label: 'GUARDED',  max: 0.18 },
+  { key: 'MODERATE', color: '#ca8a04', label: 'MODERATE', max: 0.28 },
+  { key: 'ELEVATED', color: '#d97706', label: 'ELEVATED', max: 0.38 },
+  { key: 'HIGH',     color: '#ea580c', label: 'HIGH',     max: 0.50 },
+  { key: 'SEVERE',   color: '#e11d48', label: 'SEVERE',   max: 0.62 },
+  { key: 'CRITICAL', color: '#dc2626', label: 'CRITICAL', max: 0.75 },
+  { key: 'EXTREME',  color: '#b91c1c', label: 'EXTREME',  max: 1.00 },
 ];
 
 function getTierKey(prob: number) {
@@ -55,8 +56,8 @@ export default function DonutChart({ countries }: DonutChartProps) {
     }).filter(Boolean);
   }, [counts, total]);
 
-  // Top 3 risk tiers for display
-  const topTiers = TIERS.filter(t => (counts[t.key] ?? 0) > 0).slice(0, 5);
+  // Top tiers for display — shown highest-risk first
+  const topTiers = [...TIERS].reverse().filter(t => (counts[t.key] ?? 0) > 0).slice(0, 5);
   const criticalCount = (counts['EXTREME'] ?? 0) + (counts['CRITICAL'] ?? 0) + (counts['SEVERE'] ?? 0);
 
   return (
